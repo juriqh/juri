@@ -1,46 +1,87 @@
 # juri
 Accidents severity prediction 
 
-Project Report: GPU-Accelerated US Accident Severity Prediction
-Objective:
-To predict the severity level (1-4 classes) of US traffic accidents using the Kaggle US Accidents dataset (2016-2023) and demonstrate the efficiency of GPU acceleration using the RAPIDS ecosystem (cuDF, cuML, GPU-accelerated XGBoost).
-Dataset:
-Source: Kaggle US Accidents (2016-2023).
-Initial Size: ~7.7 million records, 46 features.
-Tooling: Loaded and processed using cudf on a GPU (NVIDIA A100).
-Methodology & Workflow:
-Data Loading: Efficiently loaded the CSV into a cudf DataFrame (~1.2s).
-Preprocessing (GPU-accelerated with cudf):
-Dropped irrelevant/high-missing columns (ID, End_Time, End_Lat/Lng, Description, etc.).
-Dropped specific time columns ('Start_Time', 'Civil_Twilight', etc.).
-Imputed low-percentage missing numericals (Temperature, Humidity, Pressure, Visibility, Wind_Speed) with the median (calculated from the training set).
-Imputed low-percentage missing categoricals (Wind_Direction, Weather_Condition) with the mode (calculated from the training set).
-Handled critical nulls: Dropped rows with remaining nulls in 'Zipcode', 'Wind_Chill(F)', and 'Precipitation(in)', significantly reducing dataset size (~2.6M rows remaining).
-Converted boolean features (Amenity, Bump, etc.) to integers.
-Feature Engineering (GPU-accelerated):
-One-Hot Encoded low-cardinality categorical features ('Sunrise_Sunset', 'State', 'Source') using cudf.get_dummies.
-Frequency Encoded high-cardinality categorical features ('Weather_Condition', 'Wind_Direction', 'City', 'County', 'Zipcode') using cudf's value_counts and map.
-Data Splitting: Split data into 70% training / 30% test sets using cuml.model_selection.train_test_split. Final training set size: ~1.8M samples.
-Target Variable: Transformed 'Severity' from 1-4 to 0-3 for model compatibility.
-Scaling: Applied cuml.preprocessing.StandardScaler to all features after encoding.
-Modeling (GPU-accelerated): Trained three classification models:
-cuML Logistic Regression (solver='qn')
-cuML Random Forest (n_estimators=300, max_depth=16)
-XGBoost Classifier (tree_method='gpu_hist', n_estimators=100, max_depth=10)
-Results & Performance:
-Model Accuracy (on Test Set):
-XGBoost: ~90.8%
-Random Forest: ~87.6%
-Logistic Regression: ~87.0%
-GPU Training Times:
-XGBoost: ~7.9s
-Random Forest: ~54.4s
-Logistic Regression: ~1.3s
-GPU Prediction Times (on ~788k test samples):
-XGBoost: ~0.23s
-Random Forest: ~0.39s
-Logistic Regression: ~0.02s
-Note: Accuracy is high, but given class imbalance, other metrics (precision/recall/F1 per class) would provide deeper insight. Training and prediction times demonstrate significant GPU speed advantages.
-Conclusion:
-The project successfully implemented a GPU-accelerated workflow using RAPIDS to predict accident severity on a large dataset. Data preprocessing and model training were performed efficiently on the GPU. XGBoost achieved the highest accuracy (90.8%) with fast training and inference times, highlighting the effectiveness of GPU acceleration for this machine learning task.
-Artifacts: The trained XGBoost model and the data scaler were saved using joblib for potential deployment or further use.
+# GPU-Accelerated US Accident Severity Prediction
+
+## Overview
+
+This project predicts the severity level (Classes 1-4) of US traffic accidents using the Kaggle US Accidents dataset (2016-2023). It leverages the RAPIDS ecosystem (`cudf`, `cuml`) and GPU-accelerated `xgboost` for efficient data processing and machine learning on a large dataset, demonstrating the benefits of GPU acceleration.
+
+## Objective
+
+*   Predict accident severity based on various features.
+*   Implement an end-to-end data science workflow using GPU acceleration via RAPIDS.
+*   Train and compare three different classification models (Logistic Regression, Random Forest, XGBoost) on the GPU.
+
+## Dataset
+
+*   **Source:** [Kaggle US Accidents (2016-2023)](https://www.kaggle.com/datasets/sobhanmoosavi/us-accidents)
+*   **Original Size:** ~7.7 million records, 46 features.
+*   **File Used:** `US_Accidents_March23.csv`
+*   **Note:** Significant data reduction occurred during preprocessing due to dropping rows with nulls in key columns ('Zipcode', 'Wind_Chill(F)', 'Precipitation(in)'), resulting in ~2.6M rows for training/testing.
+
+## Technologies Used
+
+*   **RAPIDS:**
+    *   `cudf`: GPU DataFrame manipulation.
+    *   `cuml`: GPU-accelerated machine learning (Logistic Regression, Random Forest, StandardScaler, train_test_split).
+*   **XGBoost:** GPU-accelerated training (`tree_method='gpu_hist'`).
+*   **Pandas/NumPy:** Data handling (minor use, primarily for compatibility where needed).
+*   **Scikit-learn:** Metrics (accuracy_score, classification_report - used on CPU after data conversion).
+*   **Joblib:** Saving/loading model and scaler.
+*   **Matplotlib/Seaborn:** Visualization.
+*   **Google Colab:** Development environment (with GPU runtime - NVIDIA A100 used).
+
+## Workflow
+
+1.  **Data Loading:** Loaded CSV into a `cudf` DataFrame.
+2.  **Preprocessing (cuDF):**
+    *   Dropped irrelevant columns.
+    *   Sampled data (50% used in this run) to manage resources if needed (*adjust as necessary*).
+    *   Imputed missing numericals (median) and categoricals (mode).
+    *   Dropped rows with remaining critical nulls.
+    *   Converted boolean columns to integers.
+3.  **Feature Engineering (cuDF):**
+    *   One-Hot Encoded low-cardinality categoricals (`cudf.get_dummies`).
+    *   Frequency Encoded high-cardinality categoricals (using `value_counts` and `map`).
+4.  **Data Splitting (cuML):** Split into 70% train / 30% test.
+5.  **Target Preparation:** Shifted 'Severity' labels from 1-4 to 0-3.
+6.  **Scaling (cuML):** Applied `StandardScaler` to all features.
+7.  **Model Training (GPU):**
+    *   Trained `cuml.linear_model.LogisticRegression`.
+    *   Trained `cuml.ensemble.RandomForestClassifier`.
+    *   Trained `xgboost.XGBClassifier` with `tree_method='gpu_hist'`.
+8.  **Evaluation:** Calculated accuracy using `cuml.metrics.accuracy_score`. *(Classification reports using sklearn required GPU->CPU data transfer)*.
+9.  **Artifact Saving:** Saved the best model (XGBoost) and the scaler using `joblib`.
+
+## Results Summary
+
+| Model               | Accuracy (Test Set) | GPU Train Time (s) | GPU Predict Time (s) |
+| :------------------ | :------------------ | :----------------- | :------------------- |
+| **XGBoost**         | **~90.8%**          | ~7.9s              | ~0.23s               |
+| Random Forest       | ~87.6%              | ~54.4s             | ~0.39s               |
+| Logistic Regression | ~87.0%              | ~1.3s              | ~0.02s               |
+
+*(Prediction times are for ~788k test samples)*
+
+**Observations:**
+*   XGBoost achieved the highest accuracy.
+*   GPU acceleration provided significant speedups, especially for XGBoost and Random Forest training compared to potential CPU times.
+*   Logistic Regression training and prediction were extremely fast on the GPU.
+
+## How to Use/Reproduce
+
+1.  **Environment:** Set up a Python environment with RAPIDS installed (requires compatible NVIDIA GPU and drivers). See [RAPIDS installation guide](https://rapids.ai/start.html).
+2.  **Data:** Download the `US_Accidents_March23.csv` file from the Kaggle link above and place it in the `/content/` directory (or update path in the notebook).
+3.  **Notebook:** Run the `JURI-3.ipynb` notebook cell by cell in a GPU-enabled environment (like Google Colab, Kaggle Kernels, or a local RAPIDS setup).
+4.  **Prediction:**
+    *   The trained XGBoost model is saved as `xgb_model.joblib`.
+    *   The data scaler is saved as `scaler.joblib`.
+    *   These can be loaded using `joblib.load()` for making predictions on new data (ensure new data undergoes the *exact same* preprocessing and scaling steps). *(See `make_prediction` function draft in the notebook for an example)*.
+
+## Future Work
+
+*   Explore more sophisticated imputation techniques for missing values.
+*   Perform hyperparameter tuning (e.g., using `GridSearchCV`) for potentially better model performance (though this will increase computation time).
+*   Evaluate models using additional metrics sensitive to class imbalance (Precision, Recall, F1-score per class, Confusion Matrix).
+*   Investigate feature importance to understand key drivers of accident severity.

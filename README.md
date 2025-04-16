@@ -1,0 +1,2 @@
+# juri
+Accidents severity prediction 
